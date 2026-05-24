@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英语单词朗读器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .word-item.active { background-color: #e0f2fe; border-left: 4px solid #3b82f6; }
+        /* Custom scrollbar for better look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col">
+
+    <header class="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center">
+        <h1 class="text-xl font-bold"><i class="fas fa-book-reader mr-2"></i>英语单词朗读器</h1>
+        <div class="text-sm">支持 .txt 文件</div>
+    </header>
+
+    <main class="flex-grow flex flex-col md:flex-row overflow-hidden p-4 gap-4 max-w-6xl mx-auto w-full">
+        
+        <section class="md:w-1/3 bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col gap-4 overflow-y-auto">
+            <h2 class="text-lg font-semibold mb-2 border-b pb-2">设置与控制</h2>
+
+            <div class="flex flex-col gap-2">
+                <label for="fileInput" class="font-medium text-sm text-gray-700">选择单词文件 (.txt)</label>
+                <input type="file" id="fileInput" accept=".txt" class="block w-full text-sm text-slate-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-blue-50 file:text-blue-700
+                    hover:file:bg-blue-100 cursor-pointer border border-gray-300 rounded-md p-1"
+                />
+                <p class="text-xs text-gray-500">建议格式：每行一个词条，例如 "apple - 苹果" 或 "book,书"</p>
+            </div>
+
+            <div class="flex flex-col gap-2 mt-2">
+                <label for="separator" class="font-medium text-sm text-gray-700">中英文分隔符</label>
+                <select id="separator" class="border border-gray-300 rounded-md p-2 text-sm bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="newline" selected>交替换行 (一行英文，一行中文)</option>
+                    <option value="-">连字符 (-)</option>
+                    <option value=",">逗号 (,)</option>
+                    <option value="\t">制表符 (Tab)</option>
+                    <option value="auto">自动识别 (空格/连字符/逗号)</option>
+                </select>
+            </div>
+
+            <div class="flex flex-col gap-2 mt-2">
+                <label class="font-medium text-sm text-gray-700">朗读设置</label>
+                <div class="flex items-center gap-2">
+                    <label class="text-sm w-20">英文声音:</label>
+                    <select id="enVoiceSelect" class="flex-1 border border-gray-300 rounded-md p-1 text-sm bg-gray-50 truncate"></select>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                    <label class="text-sm w-20">中文声音:</label>
+                    <select id="zhVoiceSelect" class="flex-1 border border-gray-300 rounded-md p-1 text-sm bg-gray-50 truncate"></select>
+                </div>
+                
+                <div class="flex items-center gap-2 mt-3">
+                    <label class="text-sm w-20">语速:</label>
+                    <input type="range" id="rateSlider" min="0.5" max="2" value="1" step="0.1" class="w-full accent-blue-600">
+                    <span id="rateValue" class="text-sm text-gray-600 w-8 text-right">1.0</span>
+                </div>
+                
+                <div class="flex items-center gap-2 mt-2">
+                    <input type="checkbox" id="readEnglishOnly" class="rounded text-blue-600 focus:ring-blue-500">
+                    <label for="readEnglishOnly" class="text-sm">只读英文</label>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                    <input type="checkbox" id="loopList" class="rounded text-blue-600 focus:ring-blue-500">
+                    <label for="loopList" class="text-sm">列表循环朗读</label>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                    <label class="text-sm">每词停顿:</label>
+                    <select id="pauseDuration" class="border border-gray-300 rounded-md p-1 text-sm bg-gray-50">
+                        <option value="500">0.5秒</option>
+                        <option value="1000" selected>1秒</option>
+                        <option value="2000">2秒</option>
+                        <option value="3000">3秒</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-4 flex gap-2 justify-center">
+                <button id="playBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full shadow transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fas fa-play mr-2"></i> 播放
+                </button>
+                <button id="pauseBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-full shadow transition-colors flex items-center hidden">
+                    <i class="fas fa-pause mr-2"></i> 暂停
+                </button>
+                <button id="resumeBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full shadow transition-colors flex items-center hidden">
+                    <i class="fas fa-play mr-2"></i> 继续
+                </button>
+                <button id="stopBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-full shadow transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fas fa-stop mr-2"></i> 停止
+                </button>
+            </div>
+            
+            <div id="statusMsg" class="mt-2 text-sm text-center text-gray-500 h-5">请先加载文件</div>
+        </section>
+
+        <section class="md:w-2/3 bg-white rounded-lg shadow-sm border border-gray-200 p-0 flex flex-col overflow-hidden">
+            <div class="bg-gray-50 p-3 border-b flex justify-between items-center">
+                <h2 class="font-semibold text-gray-700">单词列表 (<span id="wordCount">0</span>)</h2>
+                <div class="text-xs text-gray-500">点击列表项可跳转朗读</div>
+            </div>
+            <ul id="wordList" class="overflow-y-auto flex-grow p-2">
+                <!-- Word items will be injected here -->
+                <li class="text-center text-gray-400 mt-10">
+                    <i class="fas fa-file-alt text-4xl mb-3"></i>
+                    <p>等待加载数据...</p>
+                </li>
+            </ul>
+        </section>
+
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // UI Elements
+            const fileInput = document.getElementById('fileInput');
+            const separatorSelect = document.getElementById('separator');
+            const wordListEl = document.getElementById('wordList');
+            const wordCountEl = document.getElementById('wordCount');
+            const playBtn = document.getElementById('playBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            const resumeBtn = document.getElementById('resumeBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const enVoiceSelect = document.getElementById('enVoiceSelect');
+            const zhVoiceSelect = document.getElementById('zhVoiceSelect');
+            const rateSlider = document.getElementById('rateSlider');
+            const rateValue = document.getElementById('rateValue');
+            const readEnglishOnlyCb = document.getElementById('readEnglishOnly');
+            const loopListCb = document.getElementById('loopList');
+            const pauseDurationSel = document.getElementById('pauseDuration');
+            const statusMsg = document.getElementById('statusMsg');
+
+            // State
+            let wordsData = []; // Array of { en: '', zh: '', id: 0 }
+            let currentIndex = 0;
+            let isPlaying = false;
+            let isPaused = false;
+            let voices = [];
+            let currentUtterance = null;
+            let pauseTimeout = null;
+
+            // Speech Synthesis
+            const synth = window.speechSynthesis;
+
+            function populateVoiceList() {
+                voices = synth.getVoices();
+                if(voices.length === 0) return;
+
+                enVoiceSelect.innerHTML = '';
+                zhVoiceSelect.innerHTML = '';
+
+                // Try to find default good voices
+                let defaultEn = null;
+                let defaultZh = null;
+
+                voices.forEach((voice, index) => {
+                    const option = document.createElement('option');
+                    option.textContent = `${voice.name} (${voice.lang})`;
+                    option.value = index;
+
+                    if (voice.lang.startsWith('en')) {
+                        enVoiceSelect.appendChild(option.cloneNode(true));
+                        // Prefer Google US or UK English if available
+                        if (!defaultEn && (voice.name.includes('Google US') || voice.name.includes('Google UK'))) {
+                            defaultEn = index;
+                        }
+                    }
+                    if (voice.lang.startsWith('zh')) {
+                        zhVoiceSelect.appendChild(option.cloneNode(true));
+                         // Prefer Google Mandarin if available
+                        if (!defaultZh && voice.name.includes('Google') && (voice.lang === 'zh-CN' || voice.lang === 'zh-TW')) {
+                            defaultZh = index;
+                        }
+                    }
+                });
+                
+                // Set reasonable defaults if our preferred weren't found
+                if(enVoiceSelect.options.length > 0) {
+                     enVoiceSelect.selectedIndex = Array.from(enVoiceSelect.options).findIndex(opt => parseInt(opt.value) === defaultEn) !== -1 ? Array.from(enVoiceSelect.options).findIndex(opt => parseInt(opt.value) === defaultEn) : 0;
+                } else {
+                     const opt = document.createElement('option'); opt.textContent = "无英文声音可用"; enVoiceSelect.appendChild(opt);
+                }
+                
+                if(zhVoiceSelect.options.length > 0) {
+                     zhVoiceSelect.selectedIndex = Array.from(zhVoiceSelect.options).findIndex(opt => parseInt(opt.value) === defaultZh) !== -1 ? Array.from(zhVoiceSelect.options).findIndex(opt => parseInt(opt.value) === defaultZh) : 0;
+                } else {
+                     const opt = document.createElement('option'); opt.textContent = "无中文声音可用"; zhVoiceSelect.appendChild(opt);
+                }
+            }
+
+            populateVoiceList();
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = populateVoiceList;
+            }
+
+            rateSlider.addEventListener('input', () => { rateValue.textContent = rateSlider.value; });
+            
+            // Re-parse when separator changes
+            separatorSelect.addEventListener('change', () => {
+                if(fileInput.files.length > 0) {
+                    processFile(fileInput.files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    processFile(file);
+                }
+            });
+
+            playBtn.addEventListener('click', startReading);
+            pauseBtn.addEventListener('click', pauseReading);
+            resumeBtn.addEventListener('click', resumeReading);
+            stopBtn.addEventListener('click', stopReading);
+
+            function processFile(file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const content = e.target.result;
+                    parseText(content);
+                };
+                reader.onerror = function() {
+                    alert("无法读取文件。");
+                }
+                reader.readAsText(file);
+            }
+
+            function parseText(text) {
+                wordsData = [];
+                const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+                const sepType = separatorSelect.value;
+
+                if (sepType === 'newline') {
+                    // English on one line, Chinese on next
+                    for (let i = 0; i < lines.length; i += 2) {
+                        const en = lines[i].trim();
+                        const zh = i + 1 < lines.length ? lines[i+1].trim() : '';
+                        if (en) wordsData.push({ id: wordsData.length, en, zh });
+                    }
+                } else {
+                    lines.forEach((line, index) => {
+                        let en = '';
+                        let zh = '';
+                        
+                        if (sepType === 'auto') {
+                            // Try common separators
+                            const separators = [' - ', '-', '——', '\t', ',', '，', ':'];
+                            let found = false;
+                            for (let sep of separators) {
+                                if (line.includes(sep)) {
+                                    const parts = line.split(sep);
+                                    en = parts[0].trim();
+                                    zh = parts.slice(1).join(sep).trim(); // Re-join rest in case of multiple separators
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) {
+                                // If no separator, treat whole line as English, no translation
+                                // Or use regex to find boundary between ascii and non-ascii
+                                const match = line.match(/^([\x00-\x7F]+)(.*)$/);
+                                if(match && match[2].trim()) {
+                                    en = match[1].trim();
+                                    zh = match[2].trim();
+                                } else {
+                                    en = line.trim();
+                                }
+                            }
+                        } else {
+                            // Use specific separator
+                            const parts = line.split(sepType);
+                            en = parts[0].trim();
+                            if (parts.length > 1) {
+                                zh = parts.slice(1).join(sepType).trim();
+                            }
+                        }
+
+                        if (en) {
+                            wordsData.push({ id: index, en, zh });
+                        }
+                    });
+                }
+
+                renderWordList();
+                updateUIState();
+                
+                if (wordsData.length > 0) {
+                    statusMsg.textContent = `成功加载 ${wordsData.length} 个词条`;
+                    playBtn.disabled = false;
+                } else {
+                    statusMsg.textContent = "未找到有效词条";
+                    playBtn.disabled = true;
+                }
+            }
+
+            function renderWordList() {
+                wordListEl.innerHTML = '';
+                wordCountEl.textContent = wordsData.length;
+
+                if(wordsData.length === 0) {
+                     wordListEl.innerHTML = '<li class="text-center text-gray-400 mt-10"><p>解析后无数据</p></li>';
+                     return;
+                }
+
+                wordsData.forEach((item, index) => {
+                    const li = document.createElement('li');
+                    li.className = `word-item flex justify-between p-3 border-b cursor-pointer hover:bg-gray-100 transition-colors ${index === currentIndex ? 'active' : ''}`;
+                    li.id = `word-${index}`;
+                    
+                    const enSpan = document.createElement('span');
+                    enSpan.className = 'font-semibold text-blue-800 text-lg break-words w-1/2 pr-2';
+                    enSpan.textContent = item.en;
+
+                    const zhSpan = document.createElement('span');
+                    zhSpan.className = 'text-gray-600 break-words w-1/2 text-right';
+                    zhSpan.textContent = item.zh;
+
+                    li.appendChild(enSpan);
+                    li.appendChild(zhSpan);
+
+                    li.addEventListener('click', () => {
+                        jumpToWord(index);
+                    });
+
+                    wordListEl.appendChild(li);
+                });
+            }
+
+            function updateListHighlight() {
+                const prevActive = document.querySelector('.word-item.active');
+                if (prevActive) prevActive.classList.remove('active');
+                
+                if (wordsData.length > 0 && currentIndex < wordsData.length) {
+                    const newActive = document.getElementById(`word-${currentIndex}`);
+                    if (newActive) {
+                        newActive.classList.add('active');
+                        // Auto scroll
+                        newActive.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            }
+
+            function jumpToWord(index) {
+                currentIndex = index;
+                updateListHighlight();
+                if (isPlaying || isPaused) {
+                    stopReading();
+                    // Small delay to ensure synthesis is fully stopped before restarting
+                    setTimeout(() => {
+                        startReading();
+                    }, 100);
+                }
+            }
+
+            function updateUIState() {
+                if (isPlaying) {
+                    playBtn.classList.add('hidden');
+                    if (isPaused) {
+                        pauseBtn.classList.add('hidden');
+                        resumeBtn.classList.remove('hidden');
+                        stopBtn.disabled = false;
+                        statusMsg.textContent = "朗读已暂停";
+                    } else {
+                        pauseBtn.classList.remove('hidden');
+                        resumeBtn.classList.add('hidden');
+                        stopBtn.disabled = false;
+                        statusMsg.textContent = `正在朗读: ${currentIndex + 1} / ${wordsData.length}`;
+                    }
+                } else {
+                    playBtn.classList.remove('hidden');
+                    pauseBtn.classList.add('hidden');
+                    resumeBtn.classList.add('hidden');
+                    stopBtn.disabled = true;
+                    if (wordsData.length > 0) {
+                        statusMsg.textContent = "准备就绪";
+                    }
+                }
+            }
+
+            function startReading() {
+                if (wordsData.length === 0 || voices.length === 0) return;
+                
+                if (currentIndex >= wordsData.length) {
+                    if (loopListCb.checked) {
+                        currentIndex = 0;
+                    } else {
+                        return; // Finished
+                    }
+                }
+
+                isPlaying = true;
+                isPaused = false;
+                updateListHighlight();
+                updateUIState();
+                
+                readCurrentWord();
+            }
+
+            function readCurrentWord() {
+                if (!isPlaying || isPaused) return;
+
+                const item = wordsData[currentIndex];
+                const readEnOnly = readEnglishOnlyCb.checked;
+                
+                // Read English
+                speakText(item.en, 'en', () => {
+                    if (!isPlaying || isPaused) return;
+
+                    // Read Chinese after English finishes, unless only English is checked or no Chinese exists
+                    if (!readEnOnly && item.zh) {
+                        speakText(item.zh, 'zh', () => {
+                            if (!isPlaying || isPaused) return;
+                            scheduleNextWord();
+                        });
+                    } else {
+                        scheduleNextWord();
+                    }
+                });
+            }
+
+            function speakText(text, langType, callback) {
+                if (!text || text.trim() === '') {
+                    callback();
+                    return;
+                }
+
+                synth.cancel(); // Clear queue just in case
+                currentUtterance = new SpeechSynthesisUtterance(text);
+                
+                currentUtterance.rate = parseFloat(rateSlider.value);
+                
+                if (langType === 'en') {
+                    if(enVoiceSelect.value) {
+                         currentUtterance.voice = voices[enVoiceSelect.value];
+                    }
+                    currentUtterance.lang = 'en-US';
+                } else {
+                     if(zhVoiceSelect.value) {
+                         currentUtterance.voice = voices[zhVoiceSelect.value];
+                     }
+                    currentUtterance.lang = 'zh-CN';
+                }
+
+                currentUtterance.onend = () => {
+                    currentUtterance = null;
+                    callback();
+                };
+
+                currentUtterance.onerror = (e) => {
+                    console.error("Speech error", e);
+                    currentUtterance = null;
+                    // Try to move on even if there's an error
+                    callback();
+                };
+
+                synth.speak(currentUtterance);
+            }
+
+            function scheduleNextWord() {
+                const pauseTime = parseInt(pauseDurationSel.value, 10);
+                
+                pauseTimeout = setTimeout(() => {
+                    if (!isPlaying || isPaused) return;
+                    
+                    currentIndex++;
+                    if (currentIndex < wordsData.length) {
+                        updateListHighlight();
+                        statusMsg.textContent = `正在朗读: ${currentIndex + 1} / ${wordsData.length}`;
+                        readCurrentWord();
+                    } else {
+                        // Reached the end
+                        if (loopListCb.checked) {
+                            currentIndex = 0;
+                            updateListHighlight();
+                            readCurrentWord();
+                        } else {
+                            stopReading();
+                            currentIndex = 0; // Reset for next time
+                            updateListHighlight();
+                            statusMsg.textContent = "朗读完成";
+                        }
+                    }
+                }, pauseTime);
+            }
+
+            function pauseReading() {
+                if (isPlaying && !isPaused) {
+                    synth.pause();
+                    isPaused = true;
+                    if (pauseTimeout) clearTimeout(pauseTimeout);
+                    updateUIState();
+                }
+            }
+
+            function resumeReading() {
+                if (isPlaying && isPaused) {
+                    isPaused = false;
+                    
+                    if (synth.paused) {
+                        synth.resume();
+                    } else {
+                        // If it wasn't paused mid-speech (e.g. paused during the timeout delay)
+                        readCurrentWord(); 
+                    }
+                    updateUIState();
+                }
+            }
+
+            function stopReading() {
+                isPlaying = false;
+                isPaused = false;
+                synth.cancel(); // Stop current speech
+                if (pauseTimeout) clearTimeout(pauseTimeout);
+                currentUtterance = null;
+                updateUIState();
+            }
+            
+            // Clean up on page unload
+            window.addEventListener('beforeunload', () => {
+                synth.cancel();
+            });
+
+        });
+    </script>
+</body>
+</html>
